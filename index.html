@@ -1,685 +1,653 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  CheckCircle, Briefcase, Users, MessageSquare, Mic, Play, 
+  Settings, CreditCard, ChevronRight, Search, FileText, 
+  Wallet, ShieldCheck, Bell, User, Plus, Send, X, Star,
+  Clock, CheckSquare, UploadCloud, AudioLines, FileVideo
+} from 'lucide-react';
 
-// ─── STYLES ───────────────────────────────────────────────────────────────────
-const G = {
-  bg: "#050508",
-  panel: "#0a0a12",
-  card: "#0f0f1a",
-  border: "#1a1a2e",
-  accent: "#00d4ff",
-  green: "#00ff88",
-  red: "#ff3366",
-  gold: "#ffd700",
-  warn: "#ff9500",
-  text: "#e8e8f0",
-  muted: "#4a4a6a",
-  font: "'Courier New', monospace",
-  sans: "'Georgia', serif",
-};
-
-const css = `
-  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;500;700&display=swap');
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  ::-webkit-scrollbar { width: 4px; } 
-  ::-webkit-scrollbar-track { background: #050508; }
-  ::-webkit-scrollbar-thumb { background: #1a1a2e; border-radius: 2px; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-  @keyframes slide-in { from{transform:translateX(120%);opacity:0} to{transform:translateX(0);opacity:1} }
-  @keyframes slide-up { from{transform:translateY(30px);opacity:0} to{transform:translateY(0);opacity:1} }
-  @keyframes glow-pulse { 0%,100%{box-shadow:0 0 8px #00d4ff44} 50%{box-shadow:0 0 24px #00d4ff88} }
-  @keyframes scan { 0%{transform:translateY(0)} 100%{transform:translateY(100%)} }
-  @keyframes ticker { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
-  @keyframes pop-in { 0%{transform:scale(0.7) translateY(40px);opacity:0} 70%{transform:scale(1.05)} 100%{transform:scale(1) translateY(0);opacity:1} }
-  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
-  @keyframes border-run {
-    0%{background-position:0% 0%} 25%{background-position:100% 0%}
-    50%{background-position:100% 100%} 75%{background-position:0% 100%} 100%{background-position:0% 0%}
-  }
-  .tab-btn { background:none; border:none; cursor:pointer; transition:all 0.2s; }
-  .tab-btn:hover { opacity:0.8; }
-  .upload-zone { transition:all 0.3s; }
-  .upload-zone:hover { border-color:#00d4ff !important; background:#00d4ff08 !important; }
-  .signal-row:hover { background:#ffffff08 !important; }
-  .pop-btn { transition:all 0.2s; cursor:pointer; }
-  .pop-btn:hover { transform:scale(1.05); }
-`;
-
-// ─── MOCK MARKET DATA ─────────────────────────────────────────────────────────
-const initMarket = () => ({
-  BTC:  { price: 74230 + (Math.random()-0.5)*800, change: +(Math.random()*4-2).toFixed(2) },
-  ETH:  { price: 3520  + (Math.random()-0.5)*120, change: +(Math.random()*4-2).toFixed(2) },
-  BNB:  { price: 598   + (Math.random()-0.5)*20,  change: +(Math.random()*4-2).toFixed(2) },
-  ANKR: { price: 0.00574 + (Math.random()-0.5)*0.0005, change: +(Math.random()*6-3).toFixed(2) },
-  SOL:  { price: 148   + (Math.random()-0.5)*8,   change: +(Math.random()*5-2.5).toFixed(2) },
-  XRP:  { price: 0.548 + (Math.random()-0.5)*0.02, change: +(Math.random()*4-2).toFixed(2) },
-});
-
-const NEWS_FEED = [
-  "🔴 BREAKING: Fed hints at rate pause — Crypto markets react with volatility",
-  "🟢 Whale Alert: 2,400 BTC moved to Binance exchange wallet",
-  "🟡 SEC delays ETF decision — market uncertainty rises",
-  "🔴 Mt.Gox creditors to receive $9B in BTC — sell pressure incoming",
-  "🟢 BlackRock BTC ETF hits record $1.2B single-day inflow",
-  "🔴 Binance faces regulatory probe in 3 new jurisdictions",
-  "🟢 ETH staking ratio hits ATH — reduced sell pressure signal",
-  "🟡 ANKR partnership announced with major cloud provider",
-  "🔴 Crypto total market cap drops 4.2% in 24 hours",
-  "🟢 BTC open interest spikes $2.1B — momentum building",
-];
-
-const TF_SIGNALS = {
-  "1m":  { bias:"SHORT", confidence:62, action:"Scalp only — extreme caution", next_move:"Next 5min: Bearish candle expected" },
-  "5m":  { bias:"SHORT", confidence:71, action:"Quick scalp entry 0.005749", next_move:"Next 15min: Break below support" },
-  "15m": { bias:"SHORT", confidence:78, action:"Intraday short setup forming", next_move:"Next 1hr: Target 3% down" },
-  "1h":  { bias:"LONG",  confidence:55, action:"Watch for reversal near support", next_move:"Next 4hr: Possible bounce" },
-  "4h":  { bias:"SHORT", confidence:82, action:"Strong trend continuation short", next_move:"Next 12hr: Major breakdown possible" },
-  "1d":  { bias:"SHORT", confidence:68, action:"Bear market structure intact", next_move:"Next 3d: Range between 71K–76K" },
-};
-
-// ─── CANDLE MINI CHART ────────────────────────────────────────────────────────
-function MiniCandles({ bullish }) {
-  const candles = Array.from({length:20},(_,i)=>{
-    const up = bullish ? Math.random()>0.35 : Math.random()>0.65;
-    return { up, h: 20+Math.random()*40, b: 5+Math.random()*15 };
-  });
+export default function App() {
+  const [view, setView] = useState('owner'); // 'owner', 'freelancer_new', 'freelancer_hired'
+  const [activeTab, setActiveTab] = useState('agent'); // default to agent to show the core feature
+  
   return (
-    <div style={{display:"flex",alignItems:"flex-end",gap:2,height:60,padding:"4px 0"}}>
-      {candles.map((c,i)=>(
-        <div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
-          <div style={{width:1,height:4,background:c.up?G.green:G.red,opacity:0.6}}/>
-          <div style={{width:5,height:c.b,background:c.up?G.green:G.red,borderRadius:1,opacity:0.8}}/>
-          <div style={{width:1,height:3,background:c.up?G.green:G.red,opacity:0.6}}/>
+    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col md:flex-row">
+      <Sidebar view={view} setView={setView} activeTab={activeTab} setActiveTab={setActiveTab} />
+      
+      <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
+        <Header view={view} setView={setView} />
+        
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+          {/* OWNER VIEWS */}
+          {view === 'owner' && (
+            <>
+              {activeTab === 'dashboard' && <ProjectBoard />}
+              {activeTab === 'agent' && <AgentWorkspace />}
+              {activeTab === 'team' && <TeamManagement />}
+              {activeTab === 'payments' && <PaymentModule role="owner" />}
+            </>
+          )}
+
+          {/* NEW FREELANCER (INTERVIEW) VIEW */}
+          {view === 'freelancer_new' && (
+            <FreelancerInterviewPortal />
+          )}
+
+          {/* HIRED FREELANCER VIEW */}
+          {view === 'freelancer_hired' && (
+            <>
+              {activeTab === 'workspace' && <FreelancerWorkspace />}
+              {activeTab === 'payments' && <PaymentModule role="freelancer" />}
+            </>
+          )}
         </div>
-      ))}
+      </main>
     </div>
   );
 }
 
-// ─── POPUP ALERT ─────────────────────────────────────────────────────────────
-function PopupAlert({ alert, onClose }) {
-  useEffect(()=>{ const t=setTimeout(onClose,12000); return ()=>clearTimeout(t); },[]);
-  const isLong = alert.type==="LONG";
+// --- COMPONENTS ---
+
+function Sidebar({ view, setView, activeTab, setActiveTab }) {
+  const isOwner = view === 'owner';
+  const isHired = view === 'freelancer_hired';
+
+  const ownerItems = [
+    { id: 'agent', label: 'AI Manager', icon: Mic },
+    { id: 'dashboard', label: 'Task Board', icon: CheckSquare },
+    { id: 'team', label: 'Freelancers', icon: Users },
+    { id: 'payments', label: 'Payments (INR)', icon: Wallet },
+  ];
+
+  const hiredItems = [
+    { id: 'workspace', label: 'My Workspace', icon: Briefcase },
+    { id: 'payments', label: 'Earnings & UPI', icon: Wallet },
+  ];
+
+  const navItems = isOwner ? ownerItems : isHired ? hiredItems : [];
+
   return (
-    <div style={{
-      position:"fixed", top:20, right:20, zIndex:9999,
-      background: isLong ? "linear-gradient(135deg,#001a0d,#002d1a)" : "linear-gradient(135deg,#1a0008,#2d0012)",
-      border:`2px solid ${isLong?G.green:G.red}`,
-      borderRadius:16, padding:"18px 22px", width:320,
-      boxShadow:`0 0 40px ${isLong?G.green+"66":G.red+"66"}`,
-      animation:"pop-in 0.5s ease, shake 0.3s ease 0.5s",
-    }}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <div style={{fontSize:24}}>{isLong?"🚀":"💥"}</div>
-          <div>
-            <div style={{color:isLong?G.green:G.red,fontFamily:"'Share Tech Mono',monospace",fontWeight:700,fontSize:15,letterSpacing:2}}>
-              ⚡ {isLong?"LONG NOW":"SHORT NOW"}
-            </div>
-            <div style={{color:G.muted,fontSize:10,letterSpacing:1}}>URGENT SIGNAL</div>
-          </div>
+    <div className="w-full md:w-72 bg-slate-900 text-slate-300 flex flex-col shadow-2xl flex-shrink-0 z-20 transition-all">
+      <div className="p-6 flex items-center gap-3 bg-slate-950/50">
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-lg ${isOwner ? 'bg-gradient-to-br from-indigo-500 to-purple-600' : 'bg-gradient-to-br from-emerald-400 to-teal-600'}`}>
+          {isOwner ? 'O' : 'F'}
         </div>
-        <button onClick={onClose} style={{background:"none",border:"none",color:G.muted,fontSize:18,cursor:"pointer"}}>✕</button>
-      </div>
-      <div style={{color:G.text,fontFamily:"'Share Tech Mono',monospace",fontSize:13,lineHeight:1.7}}>
-        <div style={{color:G.gold,fontWeight:700,fontSize:16,marginBottom:6}}>{alert.pair}</div>
-        <div>⏱ <span style={{color:G.accent}}>{alert.timeframe}</span> — {alert.reason}</div>
-        <div style={{marginTop:6}}>Entry: <span style={{color:G.gold}}>{alert.entry}</span></div>
-        <div>Target: <span style={{color:G.green}}>{alert.tp}</span> &nbsp;|&nbsp; SL: <span style={{color:G.red}}>{alert.sl}</span></div>
-        <div style={{marginTop:8,color:isLong?G.green:G.red,fontWeight:700,fontSize:12}}>
-          🎯 {alert.multiplier} — ${alert.from}→${alert.to} target
+        <div>
+          <h1 className="text-xl font-bold text-white tracking-wide leading-tight">
+            {isOwner ? 'BossFlow AI' : 'WorkPortal'}
+          </h1>
+          <p className="text-xs text-slate-400">Secure System</p>
         </div>
       </div>
-      <div style={{marginTop:10,height:3,background:isLong?G.green:G.red,borderRadius:2,
-        animation:"scan 12s linear forwards",transformOrigin:"left"}}/>
+      
+      {navItems.length > 0 ? (
+        <nav className="flex-1 px-4 py-6 space-y-2 flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible">
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`flex items-center gap-3 w-full px-4 py-3.5 rounded-xl transition-all whitespace-nowrap ${
+                activeTab === item.id 
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/20' 
+                  : 'hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <item.icon size={20} className={activeTab === item.id ? 'text-indigo-200' : 'text-slate-500'} />
+              <span className="font-medium text-sm">{item.label}</span>
+            </button>
+          ))}
+        </nav>
+      ) : (
+        <div className="flex-1 p-6 text-sm text-slate-500 text-center mt-10">
+          Interview Mode Active.<br/>Navigation locked.
+        </div>
+      )}
+
+      {/* Role Switcher for Demo */}
+      <div className="p-4 mt-auto border-t border-slate-800 bg-slate-950/30">
+        <p className="text-[10px] text-slate-500 mb-2 uppercase tracking-wider font-bold">Simulator Role Switcher</p>
+        <select 
+          value={view} 
+          onChange={(e) => {
+            setView(e.target.value);
+            setActiveTab(e.target.value === 'owner' ? 'agent' : e.target.value === 'freelancer_hired' ? 'workspace' : '');
+          }}
+          className="w-full bg-slate-800 text-white rounded-lg p-2.5 text-sm border border-slate-700 outline-none cursor-pointer focus:border-indigo-500 transition-colors"
+        >
+          <option value="owner">👨‍💼 Owner (Boss)</option>
+          <option value="freelancer_new">🧑‍💻 New Freelancer (Interview)</option>
+          <option value="freelancer_hired">🧑‍💻 Hired Freelancer (Working)</option>
+        </select>
+      </div>
     </div>
   );
 }
 
-// ─── MAIN APP ─────────────────────────────────────────────────────────────────
-export default function TradingAgentBot() {
-  const [tab, setTab] = useState("dashboard");
-  const [market, setMarket] = useState(initMarket());
-  const [newsIdx, setNewsIdx] = useState(0);
-  const [tf, setTf] = useState("15m");
-  const [popup, setPopup] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [analysis, setAnalysis] = useState(null);
-  const [uploadedImg, setUploadedImg] = useState(null);
-  const [time, setTime] = useState(new Date());
-  const [signals] = useState([
-    { pair:"BTC/USDT", dir:"SHORT", entry:"74,230", tp1:"73,000", tp2:"71,200", sl:"75,200", lev:"5x", rr:"1:2.5", conf:78, tf:"4h", reason:"Bear flag breakdown + Death cross forming", from:1,to:8 },
-    { pair:"ANKR/USDT", dir:"SHORT", entry:"0.005749", tp1:"0.005400", tp2:"0.005100", sl:"0.005900", lev:"10x", rr:"1:2.8", conf:82, tf:"1h", reason:"Post-pump retracement + Funding rate bearish", from:1,to:10 },
-    { pair:"ETH/USDT", dir:"SHORT", entry:"3,520", tp1:"3,350", tp2:"3,180", sl:"3,620", lev:"5x", rr:"1:2.2", conf:71, tf:"4h", reason:"Lower high pattern + Volume divergence", from:1,to:7 },
-    { pair:"SOL/USDT", dir:"LONG", entry:"148.5", tp1:"154.0", tp2:"161.0", sl:"144.0", lev:"3x", rr:"1:1.9", conf:64, tf:"1h", reason:"Support bounce + RSI oversold on 1H", from:1,to:5 },
-    { pair:"BNB/USDT", dir:"SHORT", entry:"598", tp1:"578", tp2:"555", sl:"615", lev:"5x", rr:"1:2.1", conf:69, tf:"4h", reason:"Resistance rejection + BTC correlation short", from:1,to:6 },
+function Header({ view }) {
+  return (
+    <header className="bg-white/80 backdrop-blur-md shadow-sm h-16 flex items-center justify-between px-6 flex-shrink-0 z-10 sticky top-0 border-b border-slate-200">
+      <div className="flex items-center gap-4">
+        <h2 className="text-lg font-bold text-slate-800">
+          {view === 'owner' ? 'Control Center' : view === 'freelancer_new' ? 'Live Interview' : 'Workspace'}
+        </h2>
+      </div>
+      <div className="flex items-center gap-5">
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 rounded-full border border-green-100">
+          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+          <span className="text-xs font-semibold text-green-700">System Secure</span>
+        </div>
+        <button className="text-slate-400 hover:text-indigo-600 transition-colors relative">
+          <Bell size={20} />
+          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+        </button>
+      </div>
+    </header>
+  );
+}
+
+// --- OWNER: AI AGENT WORKSPACE ---
+function AgentWorkspace() {
+  const [messages, setMessages] = useState([
+    { 
+      id: 1, 
+      sender: 'agent', 
+      text: 'Hello Boss! Ami apnar AI Manager. Ajke notun kono project esheche? Upwork ba direct client theke kono kaj thakle bolun, ami freelancer hire theke shuru kore test neya, sob manage kore nibo.', 
+      type: 'text' 
+    },
+    {
+      id: 2,
+      sender: 'owner',
+      text: 'Amar Upwork theke ekta video editing er kaj esheche. Tech channel er vlog edit korte hobe. Freelancer khujo r interview nao.',
+      type: 'text'
+    },
+    {
+      id: 3,
+      sender: 'agent',
+      text: 'Bujhte perechi boss. Tech channel er video editing. Ami LinkedIn r platform e post korar jonno ekta draft baniyechi. Dekhun thik ache kina:',
+      type: 'draft',
+      draftContent: `🔥 HIRING: Freelance Video Editor (Tech Vlogs)\n\nWe need an expert editor for a premium Upwork client.\n\nRequirements:\n- Premiere Pro / DaVinci Resolve\n- Motion Graphics (Basic AE)\n- Fast turnaround\n\n💰 Pay: ₹5,000 - ₹8,000 per video (Direct UPI)\n\nApply now and take our quick 1-min edit test! 👇`
+    }
   ]);
-  const fileRef = useRef();
+  const [input, setInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const messagesEndRef = useRef(null);
 
-  // live price updates
-  useEffect(()=>{
-    const t=setInterval(()=>{
-      setMarket(prev=>{
-        const n={...prev};
-        Object.keys(n).forEach(k=>{
-          const drift=(Math.random()-0.501)*0.003;
-          n[k]={...n[k], price:+(n[k].price*(1+drift)).toFixed(k==="ANKR"?6:2), change:+(n[k].change+(Math.random()-0.5)*0.1).toFixed(2)};
-        });
-        return n;
-      });
-      setTime(new Date());
-    },2000);
-    return ()=>clearInterval(t);
-  },[]);
+  const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  useEffect(() => scrollToBottom(), [messages, isTyping]);
 
-  // news ticker
-  useEffect(()=>{
-    const t=setInterval(()=>setNewsIdx(i=>(i+1)%NEWS_FEED.length),5000);
-    return ()=>clearInterval(t);
-  },[]);
+  const handleSend = () => {
+    if (!input.trim()) return;
+    const newMsg = { id: Date.now(), sender: 'owner', text: input, type: 'text' };
+    setMessages([...messages, newMsg]);
+    setInput('');
+    setIsTyping(true);
 
-  // auto popup alerts
-  useEffect(()=>{
-    const alerts=[
-      {type:"SHORT",pair:"ANKR/USDT",timeframe:"1H",reason:"Supertrend bearish flip detected",entry:"0.005749",tp:"0.005100",sl:"0.005900",multiplier:"10x Potential",from:1,to:10},
-      {type:"SHORT",pair:"BTC/USDT",timeframe:"4H",reason:"Bear flag breakdown — high probability",entry:"74,230",tp:"71,500",sl:"75,200",multiplier:"5x Potential",from:1,to:7},
-      {type:"LONG",pair:"SOL/USDT",timeframe:"1H",reason:"RSI oversold bounce — quick scalp",entry:"148.5",tp:"154.0",sl:"144.0",multiplier:"3x Potential",from:1,to:4},
-    ];
-    let idx=0;
-    const t=setInterval(()=>{ setPopup(alerts[idx%alerts.length]); idx++; },25000);
-    setTimeout(()=>setPopup(alerts[0]),3000);
-    return ()=>clearInterval(t);
-  },[]);
+    // AI Logic Simulation based on keywords
+    setTimeout(() => {
+      let aiResponse = { id: Date.now() + 1, sender: 'agent', type: 'text' };
+      const textLC = newMsg.text.toLowerCase();
 
-  // chart upload handler
-  const handleUpload = useCallback(async(file)=>{
-    if(!file) return;
-    setUploading(true);
-    setAnalysis(null);
-    const reader=new FileReader();
-    reader.onload=async(e)=>{
-      const b64=e.target.result.split(",")[1];
-      const mime=file.type||"image/jpeg";
-      setUploadedImg(e.target.result);
-      try {
-        const res=await fetch("https://api.anthropic.com/v1/messages",{
-          method:"POST",
-          headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({
-            model:"claude-sonnet-4-20250514",
-            max_tokens:1000,
-            messages:[{role:"user",content:[
-              {type:"image",source:{type:"base64",media_type:mime,data:b64}},
-              {type:"text",text:`You are an elite institutional crypto trader with 15+ years experience. Analyze this trading chart with maximum precision.
-
-Return ONLY a JSON object (no markdown, no backticks):
-{
-  "pair": "detected trading pair or UNKNOWN",
-  "timeframe": "detected timeframe",
-  "current_price": "price shown",
-  "direction": "LONG or SHORT",
-  "confidence": 0-100,
-  "entry": "exact entry price",
-  "tp1": "take profit 1",
-  "tp2": "take profit 2",
-  "sl": "stop loss",
-  "rr_ratio": "risk:reward",
-  "leverage": "recommended leverage",
-  "candle_pattern": "pattern name",
-  "key_indicators": ["indicator1","indicator2","indicator3"],
-  "trend": "BULLISH or BEARISH or SIDEWAYS",
-  "support": "key support level",
-  "resistance": "key resistance level",
-  "volume_signal": "description",
-  "next_15min": "price prediction",
-  "next_1hr": "price prediction",
-  "next_4hr": "price prediction",
-  "bypass_insight": "hidden market structure insight pros use",
-  "insider_note": "institutional flow or whale behavior detected",
-  "urgency": "IMMEDIATE or WAIT or AVOID",
-  "from_dollar": 1,
-  "to_dollar": estimated multiplier 2-15,
-  "summary": "2 sentence expert summary"
-}`
-            }]}]
-          })
-        });
-        const data=await res.json();
-        const txt=data.content?.find(c=>c.type==="text")?.text||"{}";
-        const clean=txt.replace(/```json|```/g,"").trim();
-        const parsed=JSON.parse(clean);
-        setAnalysis(parsed);
-        // auto popup if urgent
-        if(parsed.urgency==="IMMEDIATE"){
-          setPopup({
-            type:parsed.direction,
-            pair:parsed.pair,
-            timeframe:parsed.timeframe,
-            reason:parsed.candle_pattern+" — "+parsed.bypass_insight?.slice(0,60),
-            entry:parsed.entry,
-            tp:parsed.tp1,
-            sl:parsed.sl,
-            multiplier:`${parsed.to_dollar}x Potential`,
-            from:parsed.from_dollar||1,
-            to:parsed.to_dollar||5,
-          });
-        }
-      } catch(err){
-        setAnalysis({error:"Analysis failed. Please try again.",summary:"Upload a clear chart screenshot for best results."});
+      if (textLC.includes('approve') || textLC.includes('thik ache') || textLC.includes('post it')) {
+        aiResponse.type = 'audio_text';
+        aiResponse.text = 'Great Boss! Ami post live kore diyechi. Kichukhon er moddhei applicants ashbe. Ami tader basic interview r short test task nite shuru korbo.';
+      } else if (textLC.includes('dekhao') || textLC.includes('update') || textLC.includes('candidate')) {
+        aiResponse.type = 'review';
+        aiResponse.text = 'Boss, 3 jon apply korechilo. Ami tader test niyechi. Er moddhe "Rahul Dev" er test result sobcheye bhalo. Apni review korun:';
+        aiResponse.candidate = {
+          name: 'Rahul Dev', skill: 'Video Editor', score: '9/10',
+          feedback: 'Rahul er pacing r B-roll selection khub bhalo. Premiere pro te expert. Communication o clear.',
+          testLink: 'test_render_v1.mp4'
+        };
+      } else if (textLC.includes('hire') || textLC.includes('kaj dao')) {
+        aiResponse.text = 'Done Boss! Ami Rahul ke hire kore niyechi r system e add kore diyechi. Tar sathe Upwork er client er raw file o share kore diyechi. Kaj complete hole apnake janabo.';
+      } else {
+        aiResponse.text = 'Haa Boss, bujhte perechi. Apni jemon instruct korben ami temon bhabei management korbo.';
       }
-      setUploading(false);
-    };
-    reader.readAsDataURL(file);
-  },[]);
-
-  const tfData=TF_SIGNALS[tf]||TF_SIGNALS["15m"];
+      
+      setMessages(prev => [...prev, aiResponse]);
+      setIsTyping(false);
+    }, 2000);
+  };
 
   return (
-    <div style={{minHeight:"100vh",background:G.bg,fontFamily:"'Rajdhani',sans-serif",color:G.text,overflowX:"hidden"}}>
-      <style>{css}</style>
-      {popup && <PopupAlert alert={popup} onClose={()=>setPopup(null)}/>}
-
-      {/* HEADER */}
-      <div style={{background:`linear-gradient(90deg,${G.panel},#080818)`,borderBottom:`1px solid ${G.border}`,padding:"10px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",position:"sticky",top:0,zIndex:100}}>
-        <div style={{display:"flex",alignItems:"center",gap:14}}>
-          <div style={{width:36,height:36,borderRadius:8,background:`linear-gradient(135deg,${G.accent},${G.green})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>⚡</div>
+    <div className="h-full flex flex-col max-w-4xl mx-auto bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden relative">
+      <div className="bg-gradient-to-r from-slate-900 to-indigo-900 p-4 text-white flex items-center justify-between shadow-md z-10">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur flex items-center justify-center relative border border-white/20">
+            <Mic size={22} className="text-indigo-300" />
+            <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-400 border-2 border-indigo-900 rounded-full"></span>
+          </div>
           <div>
-            <div style={{fontFamily:"'Share Tech Mono',monospace",color:G.accent,fontSize:16,letterSpacing:2,lineHeight:1}}>APEX TRADE AGENT</div>
-            <div style={{color:G.muted,fontSize:10,letterSpacing:2}}>AI-POWERED SIGNAL ENGINE v2.0</div>
+            <h2 className="font-bold text-lg leading-tight">AI Manager Agent</h2>
+            <p className="text-indigo-200 text-xs flex items-center gap-1 mt-0.5 font-medium">
+              <AudioLines size={12} className="animate-pulse" /> Listening & Managing
+            </p>
           </div>
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:16}}>
-          <div style={{textAlign:"center"}}>
-            <div style={{color:G.green,fontFamily:"'Share Tech Mono',monospace",fontSize:11,animation:"pulse 1.5s infinite"}}>● LIVE</div>
-            <div style={{color:G.muted,fontSize:10}}>{time.toLocaleTimeString()}</div>
-          </div>
-          <div style={{background:`${G.green}11`,border:`1px solid ${G.green}44`,borderRadius:8,padding:"4px 12px",color:G.green,fontSize:11,letterSpacing:1}}>MARKET OPEN</div>
-        </div>
+        <button className="bg-white/10 hover:bg-white/20 p-2 rounded-lg transition">
+          <Settings size={18} />
+        </button>
       </div>
 
-      {/* NEWS TICKER */}
-      <div style={{background:"#080812",borderBottom:`1px solid ${G.border}`,padding:"6px 20px",overflow:"hidden",whiteSpace:"nowrap"}}>
-        <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:G.muted,letterSpacing:1}}>LIVE NEWS &nbsp;›&nbsp; </span>
-        <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:G.gold,transition:"opacity 0.5s"}}>{NEWS_FEED[newsIdx]}</span>
-      </div>
-
-      {/* MARKET BAR */}
-      <div style={{display:"flex",gap:0,overflowX:"auto",background:"#070710",borderBottom:`1px solid ${G.border}`,padding:"8px 16px",gap:4}}>
-        {Object.entries(market).map(([sym,d])=>(
-          <div key={sym} style={{background:G.card,borderRadius:8,padding:"6px 12px",minWidth:110,border:`1px solid ${d.change>=0?G.green+"22":G.red+"22"}`,flexShrink:0}}>
-            <div style={{color:G.muted,fontSize:9,letterSpacing:1}}>{sym}/USDT</div>
-            <div style={{fontFamily:"'Share Tech Mono',monospace",color:G.text,fontSize:12,fontWeight:700}}>{sym==="ANKR"?d.price.toFixed(6):sym==="XRP"?d.price.toFixed(3):d.price.toLocaleString("en",{maximumFractionDigits:0})}</div>
-            <div style={{color:d.change>=0?G.green:G.red,fontSize:11,fontWeight:700}}>{d.change>=0?"+":""}{d.change}%</div>
-          </div>
-        ))}
-      </div>
-
-      {/* TABS */}
-      <div style={{display:"flex",background:"#070710",borderBottom:`1px solid ${G.border}`,padding:"0 16px"}}>
-        {[["dashboard","⬡ Dashboard"],["upload","⬆ Chart Analysis"],["signals","⚡ Signals"],["timeframe","⏱ Timeframe"]].map(([id,label])=>(
-          <button key={id} className="tab-btn" onClick={()=>setTab(id)} style={{
-            padding:"12px 18px",fontFamily:"'Share Tech Mono',monospace",fontSize:12,letterSpacing:1,
-            color:tab===id?G.accent:G.muted,
-            borderBottom:tab===id?`2px solid ${G.accent}`:"2px solid transparent",
-          }}>{label}</button>
-        ))}
-      </div>
-
-      <div style={{padding:16,maxWidth:900,margin:"0 auto"}}>
-
-        {/* ── DASHBOARD ── */}
-        {tab==="dashboard" && (
-          <div style={{animation:"slide-up 0.4s ease"}}>
-            {/* Strategy multiplier targets */}
-            <div style={{background:`linear-gradient(135deg,${G.card},#0a0a18)`,border:`1px solid ${G.gold}33`,borderRadius:16,padding:18,marginBottom:16}}>
-              <div style={{color:G.gold,fontFamily:"'Share Tech Mono',monospace",fontSize:12,letterSpacing:2,marginBottom:14}}>🎯 GROWTH TARGET MATRIX — $1 → $10</div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8}}>
-                {[
-                  {trades:1,from:1,to:3,rr:"1:3",lev:"5x"},
-                  {trades:2,from:1,to:5,rr:"1:2.5",lev:"7x"},
-                  {trades:3,from:1,to:7,rr:"1:2.2",lev:"10x"},
-                  {trades:4,from:1,to:9,rr:"1:2.0",lev:"10x"},
-                  {trades:5,from:1,to:12,rr:"1:1.8",lev:"15x"},
-                ].map((t,i)=>(
-                  <div key={i} style={{background:"#ffffff06",borderRadius:10,padding:"10px 8px",textAlign:"center",border:`1px solid ${G.gold}22`}}>
-                    <div style={{color:G.muted,fontSize:9,letterSpacing:1}}>TRACK {t.trades}</div>
-                    <div style={{color:G.gold,fontFamily:"'Share Tech Mono',monospace",fontSize:14,fontWeight:700,margin:"4px 0"}}>${t.from}→${t.to}</div>
-                    <div style={{color:G.green,fontSize:10}}>{t.rr}</div>
-                    <div style={{color:G.warn,fontSize:10}}>{t.lev}</div>
+      <div className="flex-1 p-4 md:p-6 overflow-y-auto bg-slate-50/50 space-y-6">
+        {messages.map((msg) => (
+          <div key={msg.id} className={`flex ${msg.sender === 'owner' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[85%] md:max-w-[75%] flex flex-col gap-2 ${msg.sender === 'owner' ? 'items-end' : 'items-start'}`}>
+              
+              {/* Message Bubble */}
+              <div className={`rounded-2xl p-4 shadow-sm ${
+                msg.sender === 'owner' 
+                  ? 'bg-indigo-600 text-white rounded-tr-sm' 
+                  : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm'
+              }`}>
+                {msg.type === 'audio_text' && (
+                  <div className="flex items-center gap-2 mb-2 text-indigo-600 bg-indigo-50 w-fit px-3 py-1 rounded-full text-xs font-bold border border-indigo-100">
+                    <Play size={12} fill="currentColor" /> Voice Message Simulated
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Market overview grid */}
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:16}}>
-              {[
-                {label:"BTC Dominance",val:"54.2%",sub:"Rising — Alts weak",color:G.accent,icon:"₿"},
-                {label:"Fear & Greed",val:"38",sub:"Fear Zone — Cautious",color:G.warn,icon:"😨"},
-                {label:"Total Funding",val:"-0.003%",sub:"Shorts overloaded",color:G.green,icon:"📊"},
-                {label:"24h Liquidations",val:"$420M",sub:"Longs wiped mostly",color:G.red,icon:"💀"},
-                {label:"Open Interest",val:"$18.4B",sub:"+2.1% building",color:G.accent,icon:"📈"},
-                {label:"Market Bias",val:"BEARISH",sub:"Short favored today",color:G.red,icon:"⬇"},
-              ].map((item,i)=>(
-                <div key={i} style={{background:G.card,border:`1px solid ${item.color}22`,borderRadius:12,padding:14,animation:`slide-up 0.4s ease ${i*0.05}s both`}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                    <div style={{color:G.muted,fontSize:10,letterSpacing:1}}>{item.label}</div>
-                    <div style={{fontSize:16}}>{item.icon}</div>
-                  </div>
-                  <div style={{fontFamily:"'Share Tech Mono',monospace",color:item.color,fontSize:20,fontWeight:700}}>{item.val}</div>
-                  <div style={{color:G.muted,fontSize:10,marginTop:2}}>{item.sub}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Pre-scheduled trade timing */}
-            <div style={{background:G.card,border:`1px solid ${G.accent}33`,borderRadius:16,padding:18,marginBottom:16}}>
-              <div style={{color:G.accent,fontFamily:"'Share Tech Mono',monospace",fontSize:12,letterSpacing:2,marginBottom:14}}>🕐 PREDICTED TRADE WINDOWS — TODAY</div>
-              {[
-                {time:"09:00–09:30 UTC",action:"SHORT BTC",reason:"US pre-market open — institutional sell pressure expected",conf:76,dir:"SHORT"},
-                {time:"13:00–13:30 UTC",action:"WATCH ANKR",reason:"Funding rate reset — post-pump fade likely continues",conf:82,dir:"SHORT"},
-                {time:"16:00–16:30 UTC",action:"LONG SOL",reason:"European close dip — Asian buyers historically step in",conf:61,dir:"LONG"},
-                {time:"20:00–21:00 UTC",action:"SHORT BTC/ETH",reason:"US market close — late-day institutional exit",conf:71,dir:"SHORT"},
-                {time:"00:00–01:00 UTC",action:"ALERT ZONE",reason:"Low liquidity — stop hunts common, avoid leverage",conf:55,dir:"AVOID"},
-              ].map((item,i)=>(
-                <div key={i} className="signal-row" style={{display:"flex",alignItems:"center",gap:12,padding:"10px 8px",borderRadius:8,marginBottom:4,borderBottom:`1px solid ${G.border}`}}>
-                  <div style={{width:2,height:36,borderRadius:1,background:item.dir==="SHORT"?G.red:item.dir==="LONG"?G.green:G.muted,flexShrink:0}}/>
-                  <div style={{flex:1}}>
-                    <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:3}}>
-                      <span style={{fontFamily:"'Share Tech Mono',monospace",color:G.gold,fontSize:12}}>{item.time}</span>
-                      <span style={{color:item.dir==="SHORT"?G.red:item.dir==="LONG"?G.green:G.muted,fontWeight:700,fontSize:13,background:item.dir==="SHORT"?`${G.red}11`:item.dir==="LONG"?`${G.green}11`:`${G.muted}11`,padding:"1px 8px",borderRadius:4}}>{item.action}</span>
+                )}
+                <p className="text-[15px] leading-relaxed">{msg.text}</p>
+                
+                {/* Draft UI */}
+                {msg.type === 'draft' && (
+                  <div className="mt-4 bg-slate-900 rounded-xl p-5 text-slate-300 font-mono text-sm whitespace-pre-wrap shadow-inner border border-slate-800">
+                    {msg.draftContent}
+                    <div className="mt-5 flex gap-3">
+                      <button onClick={() => { setInput('Post it! Thik ache.'); handleSend(); }} className="bg-indigo-500 text-white px-5 py-2 rounded-lg text-sm font-bold hover:bg-indigo-600 transition shadow-lg shadow-indigo-500/30">
+                        Approve & Post
+                      </button>
+                      <button className="bg-slate-800 text-slate-300 px-5 py-2 rounded-lg text-sm font-bold hover:bg-slate-700 transition">
+                        Edit Draft
+                      </button>
                     </div>
-                    <div style={{color:G.muted,fontSize:11}}>{item.reason}</div>
                   </div>
-                  <div style={{textAlign:"right",flexShrink:0}}>
-                    <div style={{color:item.conf>=70?G.green:G.warn,fontFamily:"'Share Tech Mono',monospace",fontSize:14,fontWeight:700}}>{item.conf}%</div>
-                    <div style={{color:G.muted,fontSize:9}}>CONF</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+                )}
 
-        {/* ── CHART UPLOAD ── */}
-        {tab==="upload" && (
-          <div style={{animation:"slide-up 0.4s ease"}}>
-            <div style={{background:G.card,border:`1px solid ${G.border}`,borderRadius:16,padding:20,marginBottom:16}}>
-              <div style={{color:G.accent,fontFamily:"'Share Tech Mono',monospace",fontSize:13,letterSpacing:2,marginBottom:16}}>⬆ UPLOAD CHART FOR AI ANALYSIS</div>
-              
-              <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleUpload(e.target.files[0])}/>
-              
-              <div className="upload-zone" onClick={()=>fileRef.current.click()} style={{
-                border:`2px dashed ${G.border}`,borderRadius:14,padding:"32px 20px",textAlign:"center",cursor:"pointer",marginBottom:16,
-                background:uploadedImg?"#00ff8808":"transparent",
-              }}>
-                {uploadedImg ? (
-                  <img src={uploadedImg} alt="chart" style={{maxWidth:"100%",maxHeight:280,borderRadius:8,objectFit:"contain"}}/>
-                ) : (
-                  <div>
-                    <div style={{fontSize:48,marginBottom:12}}>📊</div>
-                    <div style={{color:G.text,fontSize:16,fontWeight:700,marginBottom:6}}>Drop Chart Screenshot Here</div>
-                    <div style={{color:G.muted,fontSize:12}}>Supports: Binance, TradingView, any chart screenshot</div>
-                    <div style={{color:G.accent,fontSize:11,marginTop:8}}>AI will analyze candles, indicators, patterns, support/resistance</div>
+                {/* Candidate Review UI */}
+                {msg.type === 'review' && (
+                  <div className="mt-4 bg-white border-2 border-indigo-100 rounded-xl p-0 overflow-hidden shadow-sm">
+                    <div className="bg-indigo-50 p-3 border-b border-indigo-100 flex items-center justify-between">
+                      <span className="text-xs font-bold text-indigo-800 uppercase tracking-wider">Candidate Profile</span>
+                      <div className="flex gap-1 text-amber-400"><Star size={14} fill="currentColor"/><Star size={14} fill="currentColor"/><Star size={14} fill="currentColor"/><Star size={14} fill="currentColor"/></div>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center font-bold text-slate-600">{msg.candidate.name.charAt(0)}</div>
+                        <div>
+                          <h4 className="font-bold text-slate-800">{msg.candidate.name}</h4>
+                          <p className="text-xs text-slate-500">{msg.candidate.skill} • Agent Score: {msg.candidate.score}</p>
+                        </div>
+                      </div>
+                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm text-slate-600">
+                        <strong className="text-slate-800">Agent Feedback:</strong> {msg.candidate.feedback}
+                      </div>
+                      <div className="flex items-center gap-2 p-2 bg-indigo-50/50 rounded-lg border border-indigo-100 cursor-pointer hover:bg-indigo-50 transition">
+                        <FileVideo size={20} className="text-indigo-500" />
+                        <span className="text-sm font-medium text-indigo-700 underline decoration-indigo-300 underline-offset-2">Watch Test Submission ({msg.candidate.testLink})</span>
+                      </div>
+                      <button onClick={() => { setInput('Perfect. Take hire kore nao r kaj dao.'); handleSend(); }} className="w-full bg-green-600 text-white py-2.5 rounded-lg text-sm font-bold hover:bg-green-700 transition mt-2 flex items-center justify-center gap-2 shadow-sm">
+                        <CheckCircle size={16} /> Approve & Hire
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
-
-              {uploading && (
-                <div style={{textAlign:"center",padding:24}}>
-                  <div style={{color:G.accent,fontFamily:"'Share Tech Mono',monospace",fontSize:13,animation:"pulse 1s infinite",marginBottom:8}}>⚡ ANALYZING CHART...</div>
-                  <div style={{color:G.muted,fontSize:11}}>Reading candles • Detecting patterns • Calculating signals</div>
-                  <div style={{marginTop:12,display:"flex",justifyContent:"center",gap:4}}>
-                    {[0,1,2,3,4].map(i=>(
-                      <div key={i} style={{width:6,height:6,borderRadius:"50%",background:G.accent,animation:`pulse 1s ease ${i*0.15}s infinite`}}/>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {analysis && !analysis.error && (
-                <div style={{animation:"slide-up 0.4s ease"}}>
-                  {/* Direction banner */}
-                  <div style={{
-                    background:analysis.direction==="LONG"?`linear-gradient(90deg,${G.green}22,transparent)`:`linear-gradient(90deg,${G.red}22,transparent)`,
-                    border:`1px solid ${analysis.direction==="LONG"?G.green:G.red}`,
-                    borderRadius:12,padding:"14px 18px",marginBottom:14,
-                    display:"flex",justifyContent:"space-between",alignItems:"center",
-                  }}>
-                    <div>
-                      <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:20,color:analysis.direction==="LONG"?G.green:G.red,fontWeight:700,letterSpacing:2}}>
-                        {analysis.direction==="LONG"?"🚀 GO LONG":"💥 GO SHORT"}
-                      </div>
-                      <div style={{color:G.text,fontSize:13,marginTop:3}}>{analysis.pair} • {analysis.timeframe} • {analysis.candle_pattern}</div>
-                    </div>
-                    <div style={{textAlign:"right"}}>
-                      <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:28,color:G.gold,fontWeight:700}}>{analysis.confidence}%</div>
-                      <div style={{color:G.muted,fontSize:10}}>CONFIDENCE</div>
-                    </div>
-                  </div>
-
-                  {/* Price grid */}
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
-                    {[
-                      {l:"ENTRY",v:analysis.entry,c:G.text},
-                      {l:"TP 1",v:analysis.tp1,c:G.green},
-                      {l:"TP 2",v:analysis.tp2,c:G.green},
-                      {l:"STOP LOSS",v:analysis.sl,c:G.red},
-                      {l:"R:R RATIO",v:analysis.rr_ratio,c:G.accent},
-                      {l:"LEVERAGE",v:analysis.leverage,c:G.warn},
-                    ].map((item,i)=>(
-                      <div key={i} style={{background:"#ffffff06",borderRadius:10,padding:"10px 12px",textAlign:"center",border:`1px solid ${item.c}22`}}>
-                        <div style={{color:G.muted,fontSize:9,letterSpacing:1}}>{item.l}</div>
-                        <div style={{fontFamily:"'Share Tech Mono',monospace",color:item.c,fontSize:14,fontWeight:700,marginTop:4}}>{item.v||"—"}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Predictions */}
-                  <div style={{background:"#ffffff05",borderRadius:12,padding:14,marginBottom:14}}>
-                    <div style={{color:G.gold,fontFamily:"'Share Tech Mono',monospace",fontSize:11,letterSpacing:1,marginBottom:10}}>⏱ TIME-BASED PRICE FORECAST</div>
-                    {[["15 MIN",analysis.next_15min],["1 HOUR",analysis.next_1hr],["4 HOURS",analysis.next_4hr]].map(([t,v],i)=>(
-                      <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:`1px solid ${G.border}`}}>
-                        <span style={{color:G.muted,fontSize:12,fontFamily:"'Share Tech Mono',monospace"}}>{t}</span>
-                        <span style={{color:G.text,fontSize:12}}>{v||"Calculating..."}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Insider insights */}
-                  <div style={{background:`linear-gradient(135deg,#0a0a18,#100a1a)`,border:`1px solid ${G.accent}44`,borderRadius:12,padding:14,marginBottom:12}}>
-                    <div style={{color:G.accent,fontFamily:"'Share Tech Mono',monospace",fontSize:11,letterSpacing:1,marginBottom:10}}>🔬 EXPERT INSIGHTS</div>
-                    <div style={{marginBottom:8}}>
-                      <div style={{color:G.warn,fontSize:10,letterSpacing:1,marginBottom:3}}>BYPASS INSIGHT</div>
-                      <div style={{color:G.text,fontSize:12,lineHeight:1.6}}>{analysis.bypass_insight}</div>
-                    </div>
-                    <div>
-                      <div style={{color:G.gold,fontSize:10,letterSpacing:1,marginBottom:3}}>INSTITUTIONAL FLOW</div>
-                      <div style={{color:G.text,fontSize:12,lineHeight:1.6}}>{analysis.insider_note}</div>
-                    </div>
-                  </div>
-
-                  {/* Summary */}
-                  <div style={{background:`${analysis.direction==="LONG"?G.green:G.red}11`,border:`1px solid ${analysis.direction==="LONG"?G.green:G.red}33`,borderRadius:12,padding:14}}>
-                    <div style={{color:G.text,fontSize:13,lineHeight:1.7}}>{analysis.summary}</div>
-                    <div style={{marginTop:8,color:G.gold,fontFamily:"'Share Tech Mono',monospace",fontSize:12}}>
-                      💰 $1 → ${analysis.to_dollar} target — Urgency: <span style={{color:analysis.urgency==="IMMEDIATE"?G.red:analysis.urgency==="WAIT"?G.warn:G.muted}}>{analysis.urgency}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {analysis?.error && (
-                <div style={{background:`${G.red}11`,border:`1px solid ${G.red}44`,borderRadius:12,padding:14,textAlign:"center",color:G.red}}>
-                  ⚠️ {analysis.error}
-                </div>
-              )}
-
-              {uploadedImg && !uploading && (
-                <button className="pop-btn" onClick={()=>{setUploadedImg(null);setAnalysis(null);}} style={{
-                  marginTop:12,background:"transparent",border:`1px solid ${G.border}`,borderRadius:8,
-                  color:G.muted,padding:"8px 20px",fontSize:12,width:"100%",fontFamily:"'Share Tech Mono',monospace",
-                }}>↩ Upload New Chart</button>
-              )}
+            </div>
+          </div>
+        ))}
+        
+        {isTyping && (
+          <div className="flex justify-start">
+            <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-sm px-4 py-5 shadow-sm flex items-center gap-2">
+              <AudioLines size={16} className="text-indigo-400 animate-pulse" />
+              <span className="text-xs text-slate-500 font-medium">Agent is thinking...</span>
             </div>
           </div>
         )}
+        <div ref={messagesEndRef} />
+      </div>
 
-        {/* ── SIGNALS ── */}
-        {tab==="signals" && (
-          <div style={{animation:"slide-up 0.4s ease"}}>
-            <div style={{color:G.muted,fontFamily:"'Share Tech Mono',monospace",fontSize:11,letterSpacing:2,marginBottom:14}}>⚡ ACTIVE TRADE SIGNALS — {signals.length} TOTAL</div>
-            {signals.map((s,i)=>(
-              <div key={i} style={{
-                background:`linear-gradient(135deg,${G.card},#0a0a15)`,
-                border:`1px solid ${s.dir==="SHORT"?G.red+"44":G.green+"44"}`,
-                borderRadius:16,padding:18,marginBottom:14,
-                animation:`slide-up 0.4s ease ${i*0.08}s both`,
-                boxShadow:`0 4px 20px ${s.dir==="SHORT"?G.red+"11":G.green+"11"}`,
-              }}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
-                  <div>
-                    <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:4}}>
-                      <div style={{
-                        background:s.dir==="SHORT"?`${G.red}22`:`${G.green}22`,
-                        border:`1px solid ${s.dir==="SHORT"?G.red:G.green}`,
-                        borderRadius:6,padding:"3px 10px",
-                        color:s.dir==="SHORT"?G.red:G.green,
-                        fontFamily:"'Share Tech Mono',monospace",fontSize:12,fontWeight:700,letterSpacing:1,
-                      }}>{s.dir==="SHORT"?"⬇ SHORT":"⬆ LONG"}</div>
-                      <span style={{color:G.text,fontFamily:"'Share Tech Mono',monospace",fontSize:16,fontWeight:700}}>{s.pair}</span>
-                      <span style={{background:`${G.accent}11`,color:G.accent,borderRadius:4,padding:"2px 8px",fontSize:10}}>{s.tf}</span>
-                    </div>
-                    <div style={{color:G.muted,fontSize:12}}>{s.reason}</div>
-                  </div>
-                  <div style={{textAlign:"right"}}>
-                    <div style={{fontFamily:"'Share Tech Mono',monospace",color:s.conf>=75?G.green:G.warn,fontSize:22,fontWeight:700}}>{s.conf}%</div>
-                    <div style={{color:G.muted,fontSize:9}}>SIGNAL CONF</div>
-                    <MiniCandles bullish={s.dir==="LONG"}/>
-                  </div>
-                </div>
-
-                <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:8,marginBottom:12}}>
-                  {[
-                    {l:"ENTRY",v:s.entry,c:G.text},
-                    {l:"TP 1",v:s.tp1,c:G.green},
-                    {l:"TP 2",v:s.tp2,c:G.green},
-                    {l:"STOP LOSS",v:s.sl,c:G.red},
-                    {l:"LEVERAGE",v:s.lev,c:G.warn},
-                    {l:"R:R",v:s.rr,c:G.accent},
-                  ].map((item,j)=>(
-                    <div key={j} style={{background:"#ffffff06",borderRadius:8,padding:"6px 8px",textAlign:"center"}}>
-                      <div style={{color:G.muted,fontSize:9,letterSpacing:0.5}}>{item.l}</div>
-                      <div style={{fontFamily:"'Share Tech Mono',monospace",color:item.c,fontSize:11,fontWeight:700,marginTop:2}}>{item.v}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Confidence bar */}
-                <div style={{marginBottom:8}}>
-                  <div style={{background:`${G.border}`,borderRadius:4,height:4,overflow:"hidden"}}>
-                    <div style={{width:`${s.conf}%`,height:"100%",background:`linear-gradient(90deg,${s.conf>=75?G.green:G.warn},${G.accent})`,borderRadius:4}}/>
-                  </div>
-                </div>
-
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div style={{color:G.gold,fontSize:12}}>💰 $1 → ${s.to} potential target</div>
-                  <button className="pop-btn" onClick={()=>setPopup({type:s.dir,pair:s.pair,timeframe:s.tf,reason:s.reason,entry:s.entry,tp:s.tp1,sl:s.sl,multiplier:`${s.to}x Potential`,from:s.from,to:s.to})} style={{
-                    background:s.dir==="SHORT"?`${G.red}22`:`${G.green}22`,
-                    border:`1px solid ${s.dir==="SHORT"?G.red:G.green}`,
-                    borderRadius:8,padding:"6px 14px",color:s.dir==="SHORT"?G.red:G.green,
-                    fontFamily:"'Share Tech Mono',monospace",fontSize:11,letterSpacing:1,
-                  }}>⚡ ALERT ME</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* ── TIMEFRAME ── */}
-        {tab==="timeframe" && (
-          <div style={{animation:"slide-up 0.4s ease"}}>
-            {/* TF Selector */}
-            <div style={{display:"flex",gap:8,marginBottom:20,flexWrap:"wrap"}}>
-              {Object.keys(TF_SIGNALS).map(t=>(
-                <button key={t} className="pop-btn" onClick={()=>setTf(t)} style={{
-                  background:tf===t?`${G.accent}22`:"transparent",
-                  border:`1px solid ${tf===t?G.accent:G.border}`,
-                  borderRadius:8,padding:"8px 16px",color:tf===t?G.accent:G.muted,
-                  fontFamily:"'Share Tech Mono',monospace",fontSize:13,
-                }}>{t}</button>
-              ))}
-            </div>
-
-            {/* Current TF Signal */}
-            <div style={{
-              background:`linear-gradient(135deg,${G.card},#080815)`,
-              border:`1px solid ${tfData.bias==="SHORT"?G.red+"66":G.green+"66"}`,
-              borderRadius:18,padding:24,marginBottom:16,
-              boxShadow:`0 0 40px ${tfData.bias==="SHORT"?G.red+"22":G.green+"22"}`,
-            }}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-                <div>
-                  <div style={{color:G.muted,fontSize:11,letterSpacing:2,marginBottom:4}}>TIMEFRAME BIAS — {tf}</div>
-                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:32,color:tfData.bias==="SHORT"?G.red:G.green,fontWeight:700,letterSpacing:3}}>
-                    {tfData.bias==="SHORT"?"⬇ SHORT":"⬆ LONG"}
-                  </div>
-                </div>
-                <div style={{textAlign:"center"}}>
-                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:48,color:G.gold,fontWeight:700,lineHeight:1}}>{tfData.confidence}</div>
-                  <div style={{color:G.muted,fontSize:11,letterSpacing:1}}>CONFIDENCE %</div>
-                </div>
-              </div>
-
-              <div style={{background:"#ffffff06",borderRadius:10,padding:14,marginBottom:14}}>
-                <div style={{color:G.accent,fontSize:11,letterSpacing:1,marginBottom:6}}>RECOMMENDED ACTION</div>
-                <div style={{color:G.text,fontSize:15,fontWeight:600}}>{tfData.action}</div>
-              </div>
-
-              <div style={{background:`${tfData.bias==="SHORT"?G.red:G.green}11`,border:`1px solid ${tfData.bias==="SHORT"?G.red:G.green}33`,borderRadius:10,padding:14}}>
-                <div style={{color:G.gold,fontSize:11,letterSpacing:1,marginBottom:6}}>⏭ NEXT MOVE PREDICTION</div>
-                <div style={{color:G.text,fontSize:14}}>{tfData.next_move}</div>
-              </div>
-            </div>
-
-            {/* All TF overview */}
-            <div style={{background:G.card,border:`1px solid ${G.border}`,borderRadius:16,padding:18}}>
-              <div style={{color:G.muted,fontFamily:"'Share Tech Mono',monospace",fontSize:11,letterSpacing:2,marginBottom:14}}>📋 ALL TIMEFRAME OVERVIEW</div>
-              {Object.entries(TF_SIGNALS).map(([t,d],i)=>(
-                <div key={t} onClick={()=>setTf(t)} className="signal-row" style={{
-                  display:"flex",alignItems:"center",gap:14,padding:"12px 10px",borderRadius:8,cursor:"pointer",
-                  marginBottom:4,background:tf===t?`${G.accent}08`:"transparent",
-                }}>
-                  <div style={{fontFamily:"'Share Tech Mono',monospace",color:G.accent,width:36,fontSize:13}}>{t}</div>
-                  <div style={{
-                    background:d.bias==="SHORT"?`${G.red}22`:`${G.green}22`,
-                    border:`1px solid ${d.bias==="SHORT"?G.red:G.green}`,
-                    borderRadius:5,padding:"3px 10px",color:d.bias==="SHORT"?G.red:G.green,
-                    fontFamily:"'Share Tech Mono',monospace",fontSize:11,fontWeight:700,width:70,textAlign:"center",
-                  }}>{d.bias==="SHORT"?"⬇ SHORT":"⬆ LONG"}</div>
-                  <div style={{flex:1,color:G.muted,fontSize:12}}>{d.action}</div>
-                  <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    <div style={{background:G.border,borderRadius:3,height:6,width:80,overflow:"hidden"}}>
-                      <div style={{width:`${d.confidence}%`,height:"100%",background:d.confidence>=75?G.green:G.warn,borderRadius:3}}/>
-                    </div>
-                    <div style={{fontFamily:"'Share Tech Mono',monospace",color:d.confidence>=75?G.green:G.warn,fontSize:12,width:36}}>{d.confidence}%</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Risk warning at bottom */}
-            <div style={{background:`${G.warn}11`,border:`1px solid ${G.warn}44`,borderRadius:12,padding:14,marginTop:16}}>
-              <div style={{color:G.warn,fontFamily:"'Share Tech Mono',monospace",fontSize:12,letterSpacing:1,marginBottom:6}}>⚠️ PRO RISK RULES</div>
-              <div style={{color:G.muted,fontSize:12,lineHeight:1.8}}>
-                • Never risk more than <span style={{color:G.warn}}>2% of total capital</span> per trade<br/>
-                • High timeframe (4H/1D) bias overrides lower timeframe signals<br/>
-                • Always confirm with volume before entering<br/>
-                • Reduce leverage during high-impact news events
-              </div>
-            </div>
-          </div>
-        )}
+      <div className="p-4 bg-white border-t border-slate-200 flex items-center gap-3 shadow-[0_-10px_30px_rgba(0,0,0,0.02)]">
+        <button className="p-3.5 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition relative group border border-indigo-100 flex-shrink-0">
+          <Mic size={22} />
+          <span className="absolute -top-12 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 whitespace-nowrap transition-opacity shadow-lg font-medium pointer-events-none">
+            Hold to Speak
+          </span>
+        </button>
+        <input 
+          type="text" 
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+          placeholder="Speak or type to instruct your Agent..."
+          className="flex-1 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-2xl px-5 py-3.5 outline-none transition-all text-sm font-medium"
+        />
+        <button 
+          onClick={handleSend}
+          disabled={!input.trim()}
+          className="p-3.5 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition shadow-md shadow-indigo-600/20 disabled:opacity-50 disabled:shadow-none flex-shrink-0"
+        >
+          <Send size={20} className={input.trim() ? "translate-x-0.5 -translate-y-0.5 transition-transform" : ""} />
+        </button>
       </div>
     </div>
   );
 }
+
+// --- NEW FREELANCER: INTERVIEW PORTAL ---
+function FreelancerInterviewPortal() {
+  const [step, setStep] = useState(1); // 1: Intro, 2: Q1, 3: Task, 4: Done
+  const [inputText, setInputText] = useState('');
+
+  const nextStep = () => {
+    setInputText('');
+    setStep(s => s + 1);
+  };
+
+  return (
+    <div className="max-w-3xl mx-auto min-h-[80vh] flex flex-col items-center justify-center p-4">
+      <div className="w-full bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
+        <div className="bg-slate-900 p-6 text-center relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
+          <div className="w-16 h-16 mx-auto bg-indigo-600 rounded-2xl flex items-center justify-center text-white mb-4 shadow-lg rotate-3">
+            <Briefcase size={32} />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-1">Freelance Video Editor</h2>
+          <p className="text-slate-400 text-sm">Application & Interview Process</p>
+        </div>
+
+        <div className="p-8">
+          <div className="flex gap-4 mb-8 items-start">
+            <div className="w-10 h-10 rounded-full bg-indigo-100 border-2 border-indigo-200 flex items-center justify-center flex-shrink-0">
+              <Mic size={18} className="text-indigo-600" />
+            </div>
+            <div className="bg-slate-50 border border-slate-200 p-5 rounded-2xl rounded-tl-sm text-slate-700 flex-1 shadow-sm">
+              {step === 1 && <p><strong>System Agent:</strong> Hello! Welcome to the hiring portal. I am the AI Manager. I will take your basic interview and give you a short test task. Are you ready?</p>}
+              {step === 2 && <p><strong>System Agent:</strong> Great! First question: How many years of experience do you have with Premiere Pro, and can you do motion graphics in After Effects?</p>}
+              {step === 3 && <p><strong>System Agent:</strong> Good to know. Here is your test task: <br/><br/>Please download this raw 1-minute clip: <a href="#" className="text-indigo-600 underline">raw_footage.zip</a><br/>Edit it with dynamic cuts and text, and upload the final render below. Take your time.</p>}
+              {step === 4 && <p><strong>System Agent:</strong> Perfect! I have received your submission. I will review it and show it to the Boss. If selected, you will be onboarded to our workspace. Best of luck!</p>}
+            </div>
+          </div>
+
+          {step < 3 && (
+            <div className="flex gap-3 mt-4">
+              <input 
+                type="text" 
+                value={inputText}
+                onChange={e => setInputText(e.target.value)}
+                placeholder="Type your answer..." 
+                className="flex-1 border border-slate-300 rounded-xl px-4 py-3 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all text-sm" 
+              />
+              <button onClick={nextStep} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-800 transition">Send</button>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div className="mt-4 border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center bg-slate-50 hover:bg-slate-100 transition cursor-pointer" onClick={nextStep}>
+              <UploadCloud size={40} className="mx-auto text-indigo-400 mb-3" />
+              <p className="font-bold text-slate-700 mb-1">Click to Upload Rendered Video</p>
+              <p className="text-xs text-slate-500">MP4 format, Max 50MB</p>
+            </div>
+          )}
+
+          {step === 4 && (
+            <div className="mt-4 flex justify-center">
+              <span className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-full font-bold border border-green-200">
+                <CheckCircle size={18} /> Application Complete
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- HIRED FREELANCER: WORKSPACE ---
+function FreelancerWorkspace() {
+  return (
+    <div className="max-w-5xl mx-auto space-y-6">
+      <div className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-3xl p-8 text-white shadow-lg relative overflow-hidden">
+        <div className="relative z-10 flex justify-between items-center">
+          <div>
+            <h2 className="text-3xl font-bold mb-2">Welcome to the Team!</h2>
+            <p className="text-emerald-100 max-w-lg text-sm leading-relaxed">
+              Apni test pass korechen r boss apnake hire koreche. Agent apnar sathe ekhane communicate korbe r task dibe.
+            </p>
+          </div>
+          <div className="hidden md:block bg-white/20 p-4 rounded-2xl backdrop-blur-md border border-white/20 text-center">
+            <p className="text-emerald-100 text-xs mb-1 uppercase tracking-widest font-bold">Current Rate</p>
+            <p className="text-2xl font-bold">₹ 5,000 / video</p>
+          </div>
+        </div>
+        <div className="absolute top-0 right-0 -mt-10 -mr-10 w-64 h-64 bg-white opacity-10 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Col: Task Info */}
+        <div className="lg:col-span-1 space-y-6">
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-slate-800">Active Contract</h3>
+              <span className="px-2.5 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold uppercase tracking-wider border border-blue-100">In Progress</span>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs text-slate-500 font-medium mb-1">Project Name</p>
+                <p className="font-bold text-slate-800">Tech Vlog Setup Tour #45</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 font-medium mb-1">Deadline</p>
+                <div className="flex items-center gap-2 text-slate-800 font-medium">
+                  <Clock size={16} className="text-amber-500" /> Tomorrow, 5:00 PM
+                </div>
+              </div>
+              <div className="pt-4 border-t border-slate-100">
+                <button className="w-full bg-slate-900 text-white py-2.5 rounded-xl text-sm font-bold shadow-sm hover:bg-slate-800 transition flex items-center justify-center gap-2">
+                  <CheckSquare size={16} /> Submit Final Work
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Col: Chat with Agent */}
+        <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[500px]">
+          <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center border border-indigo-200">
+              <Mic size={18} className="text-indigo-600" />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-800 text-sm">System Agent (Manager)</h3>
+              <p className="text-xs text-green-600 font-medium">Online • Monitors your tasks</p>
+            </div>
+          </div>
+          
+          <div className="flex-1 p-6 overflow-y-auto space-y-4 bg-slate-50/30">
+            <div className="flex gap-3">
+              <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center flex-shrink-0 mt-1"><Mic size={14} /></div>
+              <div className="bg-white border border-slate-200 p-3.5 rounded-2xl rounded-tl-sm text-sm text-slate-700 shadow-sm max-w-[80%]">
+                <strong>Agent:</strong> Hello Rahul! Welcome. Client er Google Drive link e raw footage deya ache: <a href="#" className="text-indigo-600 underline">drive.link/raw</a>. Kono sound issue ba visual issue pele amake janaben, ami boss ke inform korbo.
+              </div>
+            </div>
+            <div className="flex gap-3 flex-row-reverse">
+              <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 text-xs font-bold mt-1">RD</div>
+              <div className="bg-emerald-50 border border-emerald-100 p-3.5 rounded-2xl rounded-tr-sm text-sm text-slate-800 max-w-[80%]">
+                Thik ache, ami download korchi. Color grading er preset ta ki pabo?
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center flex-shrink-0 mt-1"><Mic size={14} /></div>
+              <div className="bg-white border border-slate-200 p-3.5 rounded-2xl rounded-tl-sm text-sm text-slate-700 shadow-sm max-w-[80%]">
+                <strong>Agent:</strong> Haa, ami boss er previous preset file ta apnar sathe share kore dicchi. Ek min wait korun.
+              </div>
+            </div>
+          </div>
+          
+          <div className="p-4 bg-white border-t border-slate-100">
+            <div className="flex gap-2">
+              <input type="text" placeholder="Message the Manager Agent..." className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-indigo-500 focus:bg-white transition-colors" />
+              <button className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-sm hover:bg-slate-800 transition">Send</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- OWNER: PROJECT KANBAN BOARD ---
+function ProjectBoard() {
+  return (
+    <div className="max-w-6xl mx-auto space-y-6">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">Task Board</h2>
+          <p className="text-slate-500 text-sm">Monitor all ongoing freelancer tasks</p>
+        </div>
+        <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm">
+          <Plus size={16} /> New Project
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* To Do Column */}
+        <div className="bg-slate-100/50 rounded-3xl p-4 border border-slate-200">
+          <h3 className="font-bold text-slate-700 mb-4 px-2 flex justify-between items-center">
+            Hiring / To Do <span className="bg-slate-200 text-slate-600 px-2 py-0.5 rounded text-xs">1</span>
+          </h3>
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 cursor-grab hover:shadow-md transition">
+            <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">Hiring Mode</span>
+            <h4 className="font-bold text-slate-800 mt-2 mb-1">Graphic Design - Thumbnails</h4>
+            <p className="text-xs text-slate-500 mb-3">Agent is currently interviewing 2 candidates.</p>
+            <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100">
+              <span className="text-xs font-bold text-slate-800">₹ 2,000</span>
+              <div className="w-6 h-6 rounded-full bg-slate-100 border border-slate-300 flex items-center justify-center text-xs">?</div>
+            </div>
+          </div>
+        </div>
+
+        {/* In Progress Column */}
+        <div className="bg-slate-100/50 rounded-3xl p-4 border border-slate-200">
+          <h3 className="font-bold text-slate-700 mb-4 px-2 flex justify-between items-center">
+            In Progress <span className="bg-slate-200 text-slate-600 px-2 py-0.5 rounded text-xs">1</span>
+          </h3>
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 cursor-grab hover:shadow-md transition border-l-4 border-l-blue-500">
+            <span className="bg-blue-50 text-blue-600 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">Editing</span>
+            <h4 className="font-bold text-slate-800 mt-2 mb-1">Tech Vlog Setup Tour #45</h4>
+            <p className="text-xs text-slate-500 mb-3">Client: Upwork John D.</p>
+            <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100">
+              <span className="text-xs font-bold text-slate-800">₹ 5,000</span>
+              <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center justify-center text-[10px] font-bold">RD</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Review Column */}
+        <div className="bg-slate-100/50 rounded-3xl p-4 border border-slate-200">
+          <h3 className="font-bold text-slate-700 mb-4 px-2 flex justify-between items-center">
+            In Review <span className="bg-slate-200 text-slate-600 px-2 py-0.5 rounded text-xs">0</span>
+          </h3>
+          <div className="h-24 border-2 border-dashed border-slate-300 rounded-2xl flex items-center justify-center text-sm text-slate-400 font-medium">
+            No tasks in review
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- SHARED: SECURE PAYMENTS ---
+function PaymentModule({ role }) {
+  return (
+    <div className="max-w-5xl mx-auto space-y-6">
+      <div className="flex items-center gap-4 mb-8 bg-green-50/50 p-6 rounded-3xl border border-green-100">
+        <div className="w-16 h-16 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center shadow-inner">
+          <ShieldCheck size={32} />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">Secure Vault (INR)</h2>
+          <p className="text-sm text-slate-600 font-medium mt-1 flex items-center gap-2">
+            <CheckCircle size={14} className="text-green-500" /> Fully encrypted UPI & Bank Transfer System
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Balance Card */}
+        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden border border-slate-700">
+          <p className="text-slate-400 text-sm mb-2 font-medium tracking-wide uppercase">
+            {role === 'owner' ? 'Total Spent This Month' : 'Total Earnings Available'}
+          </p>
+          <h3 className="text-5xl font-bold mb-10 tracking-tight">
+            ₹ {role === 'owner' ? '45,000' : '15,000'}
+            <span className="text-xl text-slate-400 font-normal">.00</span>
+          </h3>
+          
+          <div className="flex items-center gap-3 text-sm bg-white/10 w-fit px-4 py-2 rounded-xl backdrop-blur-sm border border-white/10">
+            <ShieldCheck size={18} className="text-green-400" />
+            <span className="font-medium">Secured Payment Gateway Active</span>
+          </div>
+          
+          <div className="absolute -bottom-10 -right-10 opacity-10">
+            <Wallet size={180} />
+          </div>
+        </div>
+
+        {/* Action Card */}
+        <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-200 flex flex-col justify-center">
+          {role === 'owner' ? (
+            <>
+              <h4 className="font-bold text-slate-800 mb-6 text-lg">Pending Payouts</h4>
+              <div className="space-y-3 mb-6">
+                <div className="flex justify-between items-center p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold">R</div>
+                    <div>
+                      <p className="font-bold text-slate-800">Rahul Dev</p>
+                      <p className="text-xs text-slate-500 font-medium">UPI: rahul@okicici</p>
+                    </div>
+                  </div>
+                  <p className="font-bold text-slate-800 text-lg">₹ 5,000</p>
+                </div>
+              </div>
+              <button className="w-full bg-green-600 hover:bg-green-700 text-white py-3.5 rounded-2xl font-bold transition shadow-lg shadow-green-600/20 flex items-center justify-center gap-2 text-lg">
+                <Wallet size={20} /> Pay Now via UPI Apps
+              </button>
+              <p className="text-center text-xs text-slate-400 mt-4">Supports GPay, PhonePe, Paytm</p>
+            </>
+          ) : (
+            <>
+              <h4 className="font-bold text-slate-800 mb-6 text-lg">Your Withdrawal Method</h4>
+              <div className="space-y-5 mb-8">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Primary UPI ID</label>
+                  <input type="text" defaultValue="rahul@okicici" className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm bg-slate-50 focus:bg-white outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all font-medium" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Bank Account (Alternative)</label>
+                  <input type="text" placeholder="Account Number" className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm bg-slate-50 focus:bg-white outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all" />
+                </div>
+              </div>
+              <button className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3.5 rounded-2xl font-bold transition shadow-lg shadow-slate-900/20 text-lg">
+                Save & Request Payout
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Dummy component for Team to keep the structure complete without bloating the file too much
+function TeamManagement() {
+  return (
+    <div className="max-w-6xl mx-auto p-8 text-center bg-white rounded-3xl border border-slate-200">
+      <Users size={48} className="mx-auto text-slate-300 mb-4" />
+      <h3 className="text-xl font-bold text-slate-700 mb-2">Team Management</h3>
+      <p className="text-slate-500">Manage your hired freelancers here. Use the Agent to hire more.</p>
+    </div>
+  );
+}
+
+
