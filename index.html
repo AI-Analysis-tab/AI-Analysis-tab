@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>⚡ Quantum Signal Bot</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:#050810;font-family:'Trebuchet MS',sans-serif;color:#e2e8f0;}
+  ::-webkit-scrollbar{width:4px;}
+  ::-webkit-scrollbar-thumb{background:#1a2540;border-radius:2px;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+  @keyframes scanIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes glow{0%,100%{box-shadow:0 0 8px #00d4ff44}50%{box-shadow:0 0 22px #00d4ffaa}}
+  @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+  @keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  .tab-btn{background:none;border:none;cursor:pointer;font-family:'Courier New',monospace;transition:all 0.2s;}
+  .tab-btn:hover{opacity:0.8;}
+  .upload-zone{transition:all 0.3s;cursor:pointer;}
+  .upload-zone:hover{border-color:#00d4ff!important;background:#00d4ff08!important;}
+  .btn{border:none;cursor:pointer;font-family:'Courier New',monospace;border-radius:8px;transition:all 0.2s;}
+  .btn:hover{opacity:0.85;transform:translateY(-1px);}
+  .btn:active{transform:translateY(0);}
+  select{outline:none;cursor:pointer;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef} = React;
+
+const G = {
+  bg:"#050810",panel:"#0a0f1e",card:"#0d1526",border:"#1a2540",
+  accent:"#00d4ff",green:"#00ff88",red:"#ff3366",orange:"#ff9f0a",
+  yellow:"#ffd60a",purple:"#bf5af2",text:"#e2e8f0",muted:"#4a5568",
+  font:"'Courier New',monospace",
+};
+
+const TICKER=[
+  {sym:"BTC",p:"74,231",c:"-1.34%",d:"▼"},{sym:"ETH",p:"3,521",c:"-0.87%",d:"▼"},
+  {sym:"ANKR",p:"0.00575",c:"+25.14%",d:"▲"},{sym:"BNB",p:"598.4",c:"+0.32%",d:"▲"},
+  {sym:"SOL",p:"142.7",c:"-2.1%",d:"▼"},{sym:"XRP",p:"0.521",c:"+1.4%",d:"▲"},
+  {sym:"DOGE",p:"0.148",c:"-3.2%",d:"▼"},{sym:"ADA",p:"0.612",c:"+0.8%",d:"▲"},
+];
+
+const TF_GUIDE=[
+  {tf:"1m",use:"Scalping",best:"08:00-10:00 & 20:00-22:00 UTC",signal:"SHORT",color:"#ff3366",reason:"High volatility open — quick 0.3-0.5% moves with tight SL"},
+  {tf:"5m",use:"Quick Swing",best:"London Open 08:00 UTC",signal:"SHORT",color:"#ff3366",reason:"Trend confirmation after 1m setup — 5-15 min holds"},
+  {tf:"15m",use:"Day Trade",best:"14:00-16:00 UTC",signal:"WATCH",color:"#ff9f0a",reason:"BTC consolidation zone — wait for breakout confirmation"},
+  {tf:"1h",use:"Swing Entry",best:"Any major session open",signal:"SHORT",color:"#ff3366",reason:"Supertrend bearish, strong momentum continuation"},
+  {tf:"4h",use:"Position Trade",best:"Weekly candle close",signal:"LONG SETUP",color:"#00ff88",reason:"Major support 73,000 — smart money accumulation zone"},
+  {tf:"1D",use:"Long Hold",best:"Monthly candle close",signal:"NEUTRAL",color:"#ff9f0a",reason:"Waiting for clear breakout above 78k resistance"},
+];
+
+const INSIDER=[
+  {time:"2m ago",type:"WHALE ALERT",msg:"142 BTC moved to Binance — potential sell pressure incoming",color:"#ff3366"},
+  {time:"5m ago",type:"FUNDING FLIP",msg:"BTC Funding Rate flipped negative (-0.0054%) — Short squeeze possible",color:"#ff9f0a"},
+  {time:"12m ago",type:"LIQUIDATION",msg:"$18.4M Long liquidated at 74,500 — cascading stop losses triggered",color:"#ff3366"},
+  {time:"18m ago",type:"NEWS IMPACT",msg:"Fed Reserve minutes: hawkish tone detected — risk-off mode",color:"#ff9f0a"},
+  {time:"25m ago",type:"SMART MONEY",msg:"Binance cold wallet reserves +0.8% — accumulation signal detected",color:"#00ff88"},
+  {time:"31m ago",type:"OI SPIKE",msg:"ANKR Open Interest +340% in 2h — potential manipulation alert",color:"#bf5af2"},
+];
+
+const BYPASS=[
+  {title:"Stop Hunt Zone",desc:"74,100-74,200 এ বড় stop loss cluster আছে। Market maker এই zone touch করে তারপর reverse করবে। এই zone-এর নিচে short enter করো।",tag:"ADVANCED",color:"#ff9f0a"},
+  {title:"Liquidity Grab Setup",desc:"High এর উপরে fake breakout হবে তারপর dump। 74,500 এর উপরে যদি candle close না হয়, short দাও।",tag:"PRO",color:"#ff3366"},
+  {title:"Funding Rate Flip Trade",desc:"Funding -0.005% এর নিচে গেলে long নাও, +0.01% এর উপরে গেলে short নাও। Historical accuracy 70%+।",tag:"INSIDER",color:"#bf5af2"},
+  {title:"CVD Divergence Signal",desc:"Price উঠছে কিন্তু Cumulative Volume Delta কমছে — fake pump। Short এর perfect entry।",tag:"ADVANCED",color:"#ff9f0a"},
+];
+
+function Ticker(){
+  const double=[...TICKER,...TICKER];
+  return(
+    <div style={{background:"#000",borderBottom:`1px solid ${G.border}`,overflow:"hidden",height:26}}>
+      <div style={{display:"flex",animation:"ticker 28s linear infinite",whiteSpace:"nowrap",width:"fit-content"}}>
+        {double.map((t,i)=>(
+          <span key={i} style={{padding:"0 18px",lineHeight:"26px",fontSize:11,fontFamily:G.font,color:t.d==="▲"?G.green:G.red}}>
+            {t.sym} {t.p} {t.d}{t.c}<span style={{color:G.muted,margin:"0 10px"}}>│</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StatBox({label,value,sub,color}){
+  return(
+    <div style={{background:G.card,border:`1px solid ${G.border}`,borderRadius:10,padding:"10px 12px",flex:1}}>
+      <div style={{color:G.muted,fontSize:9,letterSpacing:1,marginBottom:3}}>{label}</div>
+      <div style={{color:color||G.text,fontSize:16,fontFamily:G.font,fontWeight:700}}>{value}</div>
+      {sub&&<div style={{color:G.muted,fontSize:9,marginTop:2}}>{sub}</div>}
+    </div>
+  );
+}
+
+function Dashboard(){
+  const signals=[
+    {pair:"ANKR/USDT",sig:"SHORT",conf:82,entry:"0.00575",tp:"0.00510",sl:"0.00592",lev:"10x",tag:"ACTIVE"},
+    {pair:"BTC/USDT",sig:"SHORT",conf:64,entry:"74,230",tp:"72,800",sl:"75,200",lev:"5x",tag:"WATCH"},
+    {pair:"ETH/USDT",sig:"SHORT",conf:71,entry:"3,521",tp:"3,350",sl:"3,610",lev:"7x",tag:"READY"},
+  ];
+  const windows=[
+    {time:"08:00-10:00",session:"London Open",action:"SHORT BTC/ETH",pct:85,color:G.red},
+    {time:"13:00-15:00",session:"NY Pre-Market",action:"WATCH + WAIT",pct:55,color:G.orange},
+    {time:"20:00-22:00",session:"Asia Open",action:"LONG ALTS possible",pct:70,color:G.green},
+    {time:"00:00-02:00",session:"Funding Reset",action:"SHORT if +funding",pct:60,color:G.orange},
+  ];
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{background:G.card,border:`1px solid ${G.border}`,borderRadius:12,padding:14}}>
+        <div style={{color:G.accent,fontSize:10,letterSpacing:2,marginBottom:10}}>📡 ACTIVE SIGNALS</div>
+        {signals.map((s,i)=>{
+          const sc=s.sig==="SHORT"?G.red:G.green;
+          const tc=s.tag==="ACTIVE"?G.red:s.tag==="WATCH"?G.orange:G.green;
+          return(
+            <div key={i} style={{background:G.panel,borderRadius:10,padding:12,marginBottom:8,borderLeft:`3px solid ${sc}`,animation:`scanIn 0.4s ease ${i*0.1}s both`}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                  <span style={{color:G.text,fontWeight:700,fontSize:13,fontFamily:G.font}}>{s.pair}</span>
+                  <span style={{background:`${sc}22`,color:sc,borderRadius:4,padding:"2px 8px",fontSize:11,fontWeight:700}}>{s.sig==="SHORT"?"⬇":"⬆"} {s.sig}</span>
+                  <span style={{background:`${tc}22`,color:tc,borderRadius:4,padding:"2px 6px",fontSize:9,fontWeight:700}}>{s.tag}</span>
+                </div>
+                <span style={{color:sc,fontFamily:G.font,fontWeight:700}}>{s.conf}%</span>
+              </div>
+              <div style={{background:G.bg,borderRadius:4,height:5,marginBottom:8,overflow:"hidden"}}>
+                <div style={{width:`${s.conf}%`,height:"100%",background:`linear-gradient(90deg,${sc}66,${sc})`,borderRadius:4}}/>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
+                {[["ENTRY",s.entry,G.text],["TP",s.tp,G.green],["SL",s.sl,G.red],["LEV",s.lev,G.orange]].map(([l,v,c])=>(
+                  <div key={l} style={{background:G.card,borderRadius:6,padding:"5px",textAlign:"center"}}>
+                    <div style={{color:G.muted,fontSize:8}}>{l}</div>
+                    <div style={{color:c,fontFamily:G.font,fontSize:10,fontWeight:700}}>{v}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{background:G.card,border:`1px solid ${G.border}`,borderRadius:12,padding:14}}>
+        <div style={{color:G.accent,fontSize:10,letterSpacing:2,marginBottom:10}}>🕐 BEST WINDOWS TODAY (UTC)</div>
+        {windows.map((w,i)=>(
+          <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:i<3?`1px solid ${G.border}`:"none"}}>
+            <div style={{minWidth:95}}>
+              <div style={{color:G.yellow,fontFamily:G.font,fontSize:11,fontWeight:700}}>{w.time}</div>
+              <div style={{color:G.muted,fontSize:10}}>{w.session}</div>
+            </div>
+            <div style={{flex:1}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                <span style={{color:w.color,fontSize:11,fontWeight:600}}>{w.action}</span>
+                <span style={{color:w.color,fontSize:11,fontWeight:700}}>{w.pct}%</span>
+              </div>
+              <div style={{background:G.panel,borderRadius:3,height:4}}>
+                <div style={{width:`${w.pct}%`,height:"100%",background:`linear-gradient(90deg,${w.color}66,${w.color})`,borderRadius:3}}/>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function UploadAnalyzer(){
+  const [image,setImage]=useState(null);
+  const [imageB64,setImageB64]=useState(null);
+  const [loading,setLoading]=useState(false);
+  const [result,setResult]=useState(null);
+  const [error,setError]=useState(null);
+  const [tf,setTf]=useState("1h");
+  const [pair,setPair]=useState("BTC/USDT");
+  const fileRef=useRef();
+
+  const handleFile=(file)=>{
+    if(!file||!file.type.startsWith("image/"))return;
+    const r=new FileReader();
+    r.onload=(e)=>{setImage(e.target.result);setImageB64(e.target.result.split(",")[1]);setResult(null);setError(null);};
+    r.readAsDataURL(file);
+  };
+
+  const analyze=async()=>{
+    if(!imageB64)return;
+    setLoading(true);setResult(null);setError(null);
+    const prompt=`You are an EXPERT PROFESSIONAL CRYPTO TRADER with 15+ years experience. Analyze this ${pair} chart (timeframe: ${tf}) with maximum depth.
+
+Return ONLY valid JSON (no markdown):
+{
+  "signal": "SHORT" or "LONG" or "NEUTRAL",
+  "confidence": number,
+  "entry": "price",
+  "tp1": "price",
+  "tp2": "price",
+  "tp3": "price",
+  "sl": "price",
+  "leverage": "e.g. 10x",
+  "rr": "e.g. 1:2.5",
+  "timeframe_analysis": {"current": "...", "higher_tf": "...", "lower_tf": "..."},
+  "candle_pattern": "...",
+  "indicators": {"trend": "...", "momentum": "...", "volume": "...", "key_levels": "..."},
+  "market_structure": "...",
+  "smart_money": "...",
+  "liquidation_zones": "...",
+  "bypass_tricks": ["...","...","..."],
+  "best_entry_time": "...",
+  "next_24h": "...",
+  "pro_summary": "...",
+  "warning": "..."
+}`;
+    try{
+      const res=await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          model:"claude-sonnet-4-20250514",
+          max_tokens:1000,
+          messages:[{role:"user",content:[
+            {type:"image",source:{type:"base64",media_type:"image/jpeg",data:imageB64}},
+            {type:"text",text:prompt}
+          ]}]
+        })
+      });
+      const data=await res.json();
+      const text=data.content?.find(b=>b.type==="text")?.text||"";
+      const clean=text.replace(/```json|```/g,"").trim();
+      setResult(JSON.parse(clean));
+    }catch(e){setError("Analysis failed. Please try again with a clearer chart screenshot.");}
+    setLoading(false);
+  };
+
+  const sc=result?.signal==="SHORT"?G.red:result?.signal==="LONG"?G.green:G.orange;
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{display:"flex",gap:10}}>
+        <div style={{flex:1}}>
+          <div style={{color:G.muted,fontSize:10,marginBottom:4,letterSpacing:1}}>TRADING PAIR</div>
+          <select value={pair} onChange={e=>setPair(e.target.value)} style={{width:"100%",background:G.card,border:`1px solid ${G.border}`,color:G.text,borderRadius:8,padding:"9px 10px",fontFamily:G.font,fontSize:12}}>
+            {["BTC/USDT","ETH/USDT","ANKR/USDT","SOL/USDT","BNB/USDT","XRP/USDT","DOGE/USDT","ADA/USDT","MATIC/USDT","AVAX/USDT"].map(p=><option key={p}>{p}</option>)}
+          </select>
+        </div>
+        <div style={{flex:1}}>
+          <div style={{color:G.muted,fontSize:10,marginBottom:4,letterSpacing:1}}>TIMEFRAME</div>
+          <select value={tf} onChange={e=>setTf(e.target.value)} style={{width:"100%",background:G.card,border:`1px solid ${G.border}`,color:G.text,borderRadius:8,padding:"9px 10px",fontFamily:G.font,fontSize:12}}>
+            {["1m","3m","5m","15m","30m","1h","2h","4h","6h","8h","12h","1D","1W"].map(t=><option key={t}>{t}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div className="upload-zone"
+        onDrop={e=>{e.preventDefault();handleFile(e.dataTransfer.files[0]);}}
+        onDragOver={e=>e.preventDefault()}
+        onClick={()=>fileRef.current?.click()}
+        style={{padding:image?8:36,textAlign:"center",borderRadius:12,background:G.card,border:`2px dashed ${G.border}`}}>
+        <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
+        {image?(
+          <div style={{position:"relative"}}>
+            <img src={image} alt="chart" style={{width:"100%",maxHeight:260,objectFit:"contain",borderRadius:8}}/>
+            <div style={{position:"absolute",top:8,right:8,background:G.green,color:"#000",borderRadius:6,padding:"3px 10px",fontSize:11,fontWeight:700}}>✓ LOADED</div>
+          </div>
+        ):(
+          <>
+            <div style={{fontSize:38,marginBottom:10}}>📊</div>
+            <div style={{color:G.accent,fontSize:14,fontWeight:700,marginBottom:4}}>Chart Screenshot Upload</div>
+            <div style={{color:G.muted,fontSize:11}}>Drag & drop বা tap করো</div>
+            <div style={{color:G.muted,fontSize:10,marginTop:6}}>যেকোনো exchange • যেকোনো timeframe • PNG / JPG</div>
+          </>
+        )}
+      </div>
+
+      {image&&(
+        <button className="btn" onClick={analyze} disabled={loading} style={{
+          background:loading?G.border:`linear-gradient(90deg,${G.accent},#0088cc)`,
+          color:loading?G.muted:"#000",padding:"14px",fontSize:14,fontWeight:700,width:"100%",
+          animation:!loading&&!result?"glow 2s infinite":"none",
+        }}>
+          {loading?(
+            <span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
+              <span style={{display:"inline-block",width:16,height:16,border:"2px solid #fff",borderTop:"2px solid transparent",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+              DEEP AI ANALYSIS RUNNING...
+            </span>
+          ):"⚡ RUN DEEP AI ANALYSIS"}
+        </button>
+      )}
+
+      {error&&<div style={{color:G.red,background:`${G.red}11`,borderRadius:8,padding:12,fontSize:12,border:`1px solid ${G.red}33`}}>❌ {error}</div>}
+
+      {result&&(
+        <div style={{animation:"fadeIn 0.5s ease",display:"flex",flexDirection:"column",gap:12}}>
+          <div style={{background:`${sc}11`,border:`2px solid ${sc}`,borderRadius:14,padding:18,textAlign:"center"}}>
+            <div style={{color:sc,fontSize:32,fontFamily:G.font,fontWeight:700,letterSpacing:3}}>
+              {result.signal==="SHORT"?"⬇":result.signal==="LONG"?"⬆":"⟷"} {result.signal}
+            </div>
+            <div style={{background:G.panel,borderRadius:6,height:7,margin:"10px 0",overflow:"hidden"}}>
+              <div style={{width:`${result.confidence}%`,height:"100%",background:`linear-gradient(90deg,${sc}66,${sc})`,borderRadius:6}}/>
+            </div>
+            <div style={{color:sc,fontFamily:G.font,fontWeight:700,fontSize:18}}>{result.confidence}% CONFIDENCE</div>
+          </div>
+
+          <div style={{background:G.card,borderRadius:12,padding:14,border:`1px solid ${G.border}`}}>
+            <div style={{color:G.accent,fontSize:10,letterSpacing:2,marginBottom:10}}>📍 TRADE LEVELS</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              {[["ENTRY",result.entry,G.text],["STOP LOSS",result.sl,G.red],["TP 1",result.tp1,G.green],["TP 2",result.tp2,G.green],["TP 3",result.tp3,"#00ffaa"],["R:R",result.rr,G.accent],["LEVERAGE",result.leverage,G.orange],["ENTRY TIME",result.best_entry_time,G.yellow]].map(([l,v,c])=>(
+                <div key={l} style={{background:G.panel,borderRadius:8,padding:"8px 10px"}}>
+                  <div style={{color:G.muted,fontSize:9}}>{l}</div>
+                  <div style={{color:c,fontFamily:G.font,fontWeight:700,fontSize:12,marginTop:2}}>{v}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{background:G.card,borderRadius:12,padding:14,border:`1px solid ${G.border}`}}>
+            <div style={{color:G.accent,fontSize:10,letterSpacing:2,marginBottom:10}}>⏱ TIMEFRAME ANALYSIS</div>
+            {Object.entries(result.timeframe_analysis||{}).map(([k,v])=>(
+              <div key={k} style={{display:"flex",gap:10,marginBottom:7,padding:"6px 8px",background:G.panel,borderRadius:6}}>
+                <span style={{color:G.yellow,fontSize:10,minWidth:80,textTransform:"uppercase",fontWeight:700}}>{k.replace(/_/g," ")}</span>
+                <span style={{color:G.text,fontSize:11}}>{v}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{background:G.card,borderRadius:12,padding:14,border:`1px solid ${G.border}`}}>
+            <div style={{color:G.accent,fontSize:10,letterSpacing:2,marginBottom:10}}>📈 INDICATORS</div>
+            {Object.entries(result.indicators||{}).map(([k,v])=>(
+              <div key={k} style={{marginBottom:7,paddingBottom:7,borderBottom:`1px solid ${G.border}`}}>
+                <span style={{color:G.orange,fontSize:10,fontWeight:700,textTransform:"uppercase"}}>{k.replace(/_/g," ")}: </span>
+                <span style={{color:G.text,fontSize:11}}>{v}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{background:"#bf5af211",border:"1px solid #bf5af244",borderRadius:12,padding:14}}>
+            <div style={{color:G.purple,fontSize:10,letterSpacing:2,marginBottom:8}}>🏗 MARKET STRUCTURE</div>
+            <div style={{color:G.text,fontSize:12,lineHeight:1.7}}>{result.market_structure}</div>
+          </div>
+
+          <div style={{background:`${G.yellow}11`,border:`1px solid ${G.yellow}33`,borderRadius:12,padding:14}}>
+            <div style={{color:G.yellow,fontSize:10,letterSpacing:2,marginBottom:8}}>🕵️ SMART MONEY LOGIC</div>
+            <div style={{color:G.text,fontSize:12,lineHeight:1.7}}>{result.smart_money}</div>
+          </div>
+
+          {result.bypass_tricks?.length>0&&(
+            <div style={{background:`${G.red}11`,border:`1px solid ${G.red}33`,borderRadius:12,padding:14}}>
+              <div style={{color:G.red,fontSize:10,letterSpacing:2,marginBottom:8}}>⚡ BYPASS TRICKS</div>
+              {result.bypass_tricks.map((t,i)=>(
+                <div key={i} style={{display:"flex",gap:8,marginBottom:7}}>
+                  <span style={{color:G.red,fontWeight:700,minWidth:16}}>{i+1}.</span>
+                  <span style={{color:G.text,fontSize:11,lineHeight:1.5}}>{t}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{background:`${G.red}11`,border:`1px solid ${G.red}22`,borderRadius:12,padding:14}}>
+            <div style={{color:G.red,fontSize:10,letterSpacing:2,marginBottom:8}}>💥 LIQUIDATION ZONES</div>
+            <div style={{color:G.text,fontSize:12,lineHeight:1.7}}>{result.liquidation_zones}</div>
+          </div>
+
+          <div style={{background:`${G.accent}11`,border:`1px solid ${G.accent}33`,borderRadius:12,padding:14}}>
+            <div style={{color:G.accent,fontSize:10,letterSpacing:2,marginBottom:8}}>🔮 NEXT 24H PREDICTION</div>
+            <div style={{color:G.text,fontSize:12,lineHeight:1.7}}>{result.next_24h}</div>
+          </div>
+
+          <div style={{background:`linear-gradient(135deg,${G.green}0d,${G.accent}0d)`,border:`1px solid ${G.green}44`,borderRadius:12,padding:16}}>
+            <div style={{color:G.green,fontSize:10,letterSpacing:2,marginBottom:8}}>🏆 PRO TRADER VERDICT</div>
+            <div style={{color:G.text,fontSize:13,lineHeight:1.8,fontStyle:"italic"}}>"{result.pro_summary}"</div>
+          </div>
+
+          <div style={{background:`${G.orange}11`,border:`1px solid ${G.orange}33`,borderRadius:10,padding:12}}>
+            <div style={{color:G.orange,fontSize:11}}>⚠️ {result.warning}</div>
+          </div>
+
+          <button className="btn" onClick={()=>{setImage(null);setImageB64(null);setResult(null);}}
+            style={{background:G.border,color:G.muted,padding:"10px",fontSize:12}}>
+            🔄 Upload New Chart
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TimeframeGuide(){
+  return(
+    <div style={{background:G.card,border:`1px solid ${G.border}`,borderRadius:12,padding:14}}>
+      <div style={{color:G.accent,fontSize:10,letterSpacing:2,marginBottom:12}}>⏱ TIMEFRAME × SIGNAL MATRIX</div>
+      {TF_GUIDE.map((t)=>(
+        <div key={t.tf} style={{display:"flex",gap:10,alignItems:"flex-start",padding:"10px 12px",background:G.panel,borderRadius:8,border:`1px solid ${G.border}`,marginBottom:8}}>
+          <div style={{background:`${G.accent}22`,color:G.accent,borderRadius:6,padding:"4px 10px",fontFamily:G.font,fontWeight:700,fontSize:13,minWidth:38,textAlign:"center",marginTop:2}}>{t.tf}</div>
+          <div style={{flex:1}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:4,marginBottom:4}}>
+              <span style={{color:G.text,fontSize:12,fontWeight:600}}>{t.use}</span>
+              <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                <span style={{color:G.muted,fontSize:10}}>🕐 {t.best}</span>
+                <span style={{background:`${t.color}22`,color:t.color,borderRadius:4,padding:"2px 8px",fontSize:10,fontWeight:700}}>{t.signal}</span>
+              </div>
+            </div>
+            <div style={{color:G.muted,fontSize:10}}>{t.reason}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function InsiderFeed(){
+  return(
+    <div style={{background:G.card,border:`1px solid ${G.border}`,borderRadius:12,padding:14}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <div style={{color:G.purple,fontSize:10,letterSpacing:2}}>🕵️ INSIDER FLOW MONITOR</div>
+        <div style={{color:G.green,fontSize:10,animation:"pulse 2s infinite"}}>● LIVE</div>
+      </div>
+      {INSIDER.map((item,i)=>(
+        <div key={i} style={{display:"flex",gap:10,padding:"9px 10px",background:G.panel,borderRadius:8,borderLeft:`3px solid ${item.color}`,marginBottom:8,animation:`scanIn 0.3s ease ${i*0.08}s both`}}>
+          <div style={{minWidth:90}}>
+            <div style={{color:item.color,fontSize:9,fontWeight:700}}>{item.type}</div>
+            <div style={{color:G.muted,fontSize:9,marginTop:2}}>{item.time}</div>
+          </div>
+          <div style={{color:G.text,fontSize:11,lineHeight:1.5}}>{item.msg}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function BypassTricks(){
+  return(
+    <div style={{background:G.card,border:`1px solid ${G.border}`,borderRadius:12,padding:14}}>
+      <div style={{color:G.yellow,fontSize:10,letterSpacing:2,marginBottom:12}}>⚡ PRO BYPASS TRICKS</div>
+      {BYPASS.map((b,i)=>(
+        <div key={i} style={{background:G.panel,borderRadius:10,padding:12,border:`1px solid ${G.border}`,marginBottom:10,animation:`scanIn 0.3s ease ${i*0.1}s both`}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+            <span style={{color:G.yellow,fontWeight:700,fontSize:13}}>⚡ {b.title}</span>
+            <span style={{background:`${b.color}22`,color:b.color,borderRadius:4,padding:"2px 8px",fontSize:9,fontWeight:700}}>{b.tag}</span>
+          </div>
+          <div style={{color:"#bbb",fontSize:11,lineHeight:1.7}}>{b.desc}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function App(){
+  const [tab,setTab]=useState("dashboard");
+  const [time,setTime]=useState(new Date());
+  useEffect(()=>{const t=setInterval(()=>setTime(new Date()),1000);return()=>clearInterval(t);},[]);
+
+  const tabs=[
+    {id:"dashboard",label:"📊 Dashboard"},
+    {id:"upload",label:"📤 AI Analysis"},
+    {id:"timeframe",label:"⏱ Timeframes"},
+    {id:"insider",label:"🕵️ Insider"},
+    {id:"bypass",label:"⚡ Bypass"},
+  ];
+
+  return(
+    <div style={{background:G.bg,minHeight:"100vh",color:G.text}}>
+      <div style={{background:`linear-gradient(90deg,${G.panel},#0a0f1e)`,borderBottom:`1px solid ${G.border}`,padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{fontFamily:G.font,fontWeight:700,fontSize:15,color:G.accent,letterSpacing:2}}>⚡ QUANTUM SIGNAL BOT</div>
+          <div style={{color:G.muted,fontSize:9,letterSpacing:1}}>AI-POWERED CRYPTO INTELLIGENCE</div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <div style={{color:G.green,fontSize:10,animation:"pulse 2s infinite"}}>● ONLINE</div>
+          <div style={{color:G.muted,fontFamily:G.font,fontSize:10}}>{time.toLocaleTimeString()}</div>
+        </div>
+      </div>
+
+      <Ticker/>
+
+      <div style={{padding:"10px 12px 0",display:"flex",gap:8}}>
+        <StatBox label="BTC PRICE" value="$74,231" sub="-1.34% 24h" color={G.red}/>
+        <StatBox label="FEAR INDEX" value="38" sub="FEAR zone" color={G.orange}/>
+        <StatBox label="SIGNALS" value="3 SHORT" sub="Active now" color={G.red}/>
+      </div>
+
+      <div style={{display:"flex",gap:4,padding:"10px 12px 0",overflowX:"auto"}}>
+        {tabs.map(t=>(
+          <button key={t.id} className="tab-btn" onClick={()=>setTab(t.id)} style={{
+            padding:"7px 11px",borderRadius:8,fontSize:10,whiteSpace:"nowrap",
+            background:tab===t.id?G.accent:G.card,
+            color:tab===t.id?"#000":G.muted,
+            border:`1px solid ${tab===t.id?G.accent:G.border}`,
+            fontWeight:tab===t.id?700:400,
+          }}>{t.label}</button>
+        ))}
+      </div>
+
+      <div style={{padding:12}}>
+        {tab==="dashboard"&&<Dashboard/>}
+        {tab==="upload"&&<UploadAnalyzer/>}
+        {tab==="timeframe"&&<TimeframeGuide/>}
+        {tab==="insider"&&<InsiderFeed/>}
+        {tab==="bypass"&&<BypassTricks/>}
+      </div>
+
+      <div style={{padding:"8px",textAlign:"center",color:G.muted,fontSize:9,borderTop:`1px solid ${G.border}`}}>
+        ⚠️ Educational only. Always manage risk. Never trade more than you can afford to lose.
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
